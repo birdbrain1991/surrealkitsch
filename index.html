@@ -1292,7 +1292,7 @@ function startIntro() {
     // p2: remaining 77.5% = zoom (was 55%, expanded + 20% faster internally)
     const p1 = Math.min(p / 0.225, 1);
     const p2raw = Math.max((p - 0.225) / 0.775, 0);
-    const p2 = Math.min(p2raw * 1.2, 1); // 20% faster zoom
+    const p2 = Math.min(p2raw * 1.5, 1); // 25% faster zoom (was 1.2)
 
     const ex = lv(lv(12, 2, eio(p1)), lv(2, 0, eio(p2)), p2 > 0 ? 1 : 0);
     const ey = lv(lv(5, 14, eio(p1)), lv(14, -1, ein(p2)), p2 > 0 ? 1 : 0);
@@ -1308,7 +1308,8 @@ function startIntro() {
     camera.fov = lv(52, 14, ein(p2));
     camera.updateProjectionMatrix();
 
-    if(p > 0.85) canvas.style.opacity = lv(1, 0, (p-0.85)/0.15).toString();
+    // Fade to black starting at 65% of zoom (before reaching model)
+    if(p2 > 0.65) canvas.style.opacity = lv(1, 0, (p2-0.65)/0.26).toString();
 
     renderer.render(scene,camera);
   }
