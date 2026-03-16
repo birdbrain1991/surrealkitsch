@@ -293,7 +293,7 @@ function makeOrganismSVG(ci) {
   const poresSVG = pores.slice(0, clusters[ci].images.length).map((p, i) => {
     const url = clusters[ci].images[i];
     if (!url) return '';
-    const thumb = url.replace('/upload/', '/upload/w_300,q_auto,f_auto/');
+    const thumb = thumbUrl(url);
     const delay = (i * 0.28).toFixed(2);
     return `
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+10}" fill="url(#pr${ci}_${i})" style="filter:drop-shadow(0 0 7px rgba(140,25,15,0.65))"/>
@@ -412,14 +412,66 @@ const wrap = document.getElementById('cluster-wrap');
 const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 document.getElementById('cnt-tot').textContent = clusters.length;
-// also update the static HTML counter
-document.getElementById('cnt-tot').textContent = clusters.length;
 
+// ── IMAGE CACHE & PRELOADER ───────────────────────────────────────────────
+const imageCache = new Map();
+
+function preloadImage(url) {
+  if (imageCache.has(url)) return imageCache.get(url);
+  const promise = new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => resolve(url); // resolve anyway, don't block
+    img.src = url;
+  });
+  imageCache.set(url, promise);
+  return promise;
+}
+
+function thumbUrl(url) {
+  return url.replace('/upload/', '/upload/w_300,q_auto,f_auto/');
+}
+function hiUrl(url) {
+  return url.replace('/upload/', '/upload/w_1400,q_auto,f_auto/');
+}
+
+// Preload thumbnails for cluster i
+function preloadCluster(ci) {
+  clusters[ci].images.forEach(url => preloadImage(thumbUrl(url)));
+}
+
+// Wait for all thumbs of a cluster to be loaded
+function clusterReady(ci) {
+  return Promise.all(clusters[ci].images.map(url => preloadImage(thumbUrl(url))));
+}
+
+// Start: preload current + next cluster immediately, then rest in background
+preloadCluster(0);
+preloadCluster(1);
+setTimeout(() => {
+  for (let i = 2; i < clusters.length; i++) preloadCluster(i);
+}, 800);
+
+// ── BUILD & INIT CLUSTERS ─────────────────────────────────────────────────
 clusters.forEach((_, i) => {
   const el = buildCluster(i);
   el.classList.add(i === 0 ? 'state-current' : 'state-behind');
+  // mark not-yet-loaded clusters
+  if (i > 1) el.dataset.preloaded = 'false';
   wrap.appendChild(el);
 });
+
+// Swap in real image srcs once preloaded (for clusters built before cache was warm)
+function applyCachedImages(ci) {
+  const el = wrap.querySelector(`.cluster[data-ci="${ci}"]`);
+  if (!el || el.dataset.preloaded === 'true') return;
+  el.querySelectorAll('.pore-img').forEach(img => {
+    // force browser to use cached version by re-assigning href
+    const src = img.getAttribute('href');
+    if (src) { img.setAttribute('href', src + '?c=1'); img.setAttribute('href', src); }
+  });
+  el.dataset.preloaded = 'true';
+}
 
 function getEl(i) { return wrap.querySelector(`.cluster[data-ci="${i}"]`); }
 
@@ -428,6 +480,11 @@ function navigate(dir) {
   const next = current + dir;
   if (next < 0 || next >= clusters.length) return;
   animating = true;
+
+  // preload the one after next in background
+  const preloadAhead = next + dir;
+  if (preloadAhead >= 0 && preloadAhead < clusters.length) preloadCluster(preloadAhead);
+
   const curEl = getEl(current), nxtEl = getEl(next);
   curEl.classList.remove('state-current');
   nxtEl.classList.remove('state-behind','state-front','state-current');
@@ -441,6 +498,7 @@ function navigate(dir) {
     nxtEl.classList.add('state-current');
     nxtEl.style.opacity = ''; nxtEl.style.pointerEvents = '';
     current = next; updateUI(); animating = false;
+    applyCachedImages(next);
   }, 1000);
 }
 
@@ -459,8 +517,14 @@ const lbImg = document.getElementById('lb-img');
 
 function openLightbox(ci, idx) {
   lbCluster = ci; lbIndex = idx;
-  lbImg.src = clusters[ci].images[idx].replace('/upload/', '/upload/w_1400,q_auto,f_auto/');
+  const hi = hiUrl(clusters[ci].images[idx]);
+  lbImg.src = hi;
   lb.classList.add('open'); updateLbNav();
+  // preload adjacent hi-res images
+  const prev = clusters[ci].images[idx-1];
+  const next = clusters[ci].images[idx+1];
+  if (prev) preloadImage(hiUrl(prev));
+  if (next) preloadImage(hiUrl(next));
 }
 function closeLightbox() { lb.classList.remove('open'); }
 function updateLbNav() {
