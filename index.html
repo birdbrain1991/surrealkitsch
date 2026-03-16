@@ -1271,7 +1271,7 @@ function startIntro() {
   function animate(){
     if(!window._introRunning) return;
     requestAnimationFrame(animate);
-    t+=1/60;
+    t+=1.6/60;
     if(t>TOTAL&&!done){ done=true; revealGallery(); return; }
     if(done) return;
 
