@@ -208,11 +208,46 @@
   /* Main UI hidden until load complete */
   #main-ui { opacity: 0; transition: opacity 0.8s ease; }
   #main-ui.visible { opacity: 1; }
+
+  /* Info panel – top right */
+  #info-panel {
+    position: fixed;
+    top: 22px; right: 28px;
+    z-index: 100;
+    text-align: right;
+    max-width: 340px;
+    pointer-events: none;
+  }
+  #info-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 19px;
+    font-weight: 400;
+    font-style: italic;
+    letter-spacing: 0.04em;
+    color: rgba(212,196,184,0.92);
+    margin-bottom: 5px;
+    transition: opacity 0.5s ease;
+  }
+  #info-meta {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(212,196,184,0.62);
+    line-height: 1.7;
+    transition: opacity 0.5s ease;
+  }
+  #info-panel.transitioning #info-title,
+  #info-panel.transitioning #info-meta { opacity: 0; }
 </style>
 
 <div id="main-ui">
 <a id="back-btn" href="https://birdbrain1991.github.io/vault/">Vault</a>
 <div id="counter"><span id="cnt-cur">1</span> / <span id="cnt-tot">9</span></div>
+<div id="info-panel">
+  <div id="info-title"></div>
+  <div id="info-meta"></div>
+</div>
 <div id="stage"><div id="cluster-wrap"></div></div>
 <button class="nav-btn" id="prev-btn" disabled>Prev</button>
 <button class="nav-btn" id="next-btn">Next</button>
@@ -226,7 +261,10 @@
 
 <script>
 const clusters = [
-  { label: "Skulptur I", images: [
+  { label: "Skulptur I",
+    title: "Theodicy",
+    meta: "W 19,5 · H 38,5 · D 27,5 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651229/5bf7e3d6_original_dahc3m.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651223/e73f081f_original_f86cpq.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651222/ee753965_original_xewvpi.jpg",
@@ -237,7 +275,10 @@ const clusters = [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651221/ad2c6acf_original_kpe1my.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651215/387c3540_original_ptuodj.jpg"
   ]},
-  { label: "Skulptur II", images: [
+  { label: "Skulptur II",
+    title: "Femme Fatale",
+    meta: "W 22 · H 39,5 · D 27 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651215/ae190c1a_original_mjgriq.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651215/72bbecda_original_lwst3g.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651214/529499e2_original_hr2wup.jpg",
@@ -247,12 +288,18 @@ const clusters = [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651208/9842e39c_original_qh47dn.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651207/81194837_original_gfeqxb.jpg"
   ]},
-  { label: "Skulptur III", images: [
+  { label: "Skulptur III",
+    title: "Naraka Now",
+    meta: "W 24,5 · H 39,5 · D 22,5 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651208/421efbbb_original_xq1t9e.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651207/6daaa653_original_nd9v4z.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651206/d8492ce6_original_yrmg0c.jpg"
   ]},
-  { label: "Skulptur IV", images: [
+  { label: "Skulptur IV",
+    title: "Ars Diabolica",
+    meta: "W 23,5 · H 39 · D 28,5 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651206/422ef567_original_mhuk98.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651206/6385323d_original_fshlzq.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651200/0b99b9b0_original_g3nqlr.jpg",
@@ -260,7 +307,10 @@ const clusters = [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651201/c99b013e_original_if4gmm.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651200/7f931f22_original_gbxhai.jpg"
   ]},
-  { label: "Skulptur V", images: [
+  { label: "Skulptur V",
+    title: "The Crumbling God-Emperor",
+    meta: "W 49 · H 49 · D 35 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651199/66cd79d4_original_kvrazb.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651194/562495ab_original_bnjpr5.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651194/0c16fbf7_original_skyrrv.jpg",
@@ -270,14 +320,20 @@ const clusters = [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651190/2932c25b_original_anqddh.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651189/4b02af8b_original_ei0yww.jpg"
   ]},
-  { label: "Skulptur VI", images: [
+  { label: "Skulptur VI",
+    title: "Caravan of Fascism  ·  The Artist and The Fascist  ·  Blood Emperor Wilhelm",
+    meta: "W 7 · H 10 · D 12 cm  /  W 7 · H 9,5 · D 11 cm  /  W 7 · H 10,5 · D 11,5 cm\nDigital Assemblage — 3D Printed",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651188/e25183e8_original_hers27.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651188/0f669e92_original_sgmmfw.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651188/25e6d324_original_mmffpc.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651185/398e5a2e_original_tn8nun.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651185/f5d64833_original_tummjh.jpg"
   ]},
-  { label: "Skulptur VII", images: [
+  { label: "Skulptur VII",
+    title: "Ars Diabolica 2",
+    meta: "W 59,5 · H 22,5 · D 29,5 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651184/da8f9dbb_original_ywrxnv.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651184/d16601f2_original_adfvge.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651180/adaaf46c_original_pvvzfd.jpg",
@@ -285,14 +341,20 @@ const clusters = [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651179/74a20c3c_original_ja9ibc.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651179/789424c4_original_hdvbsw.jpg"
   ]},
-  { label: "Skulptur VIII", images: [
+  { label: "Skulptur VIII",
+    title: "Ars Diabolica 3",
+    meta: "W 28,5 · H 30 · D 24,5 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/9c351b87_original_ofsc3h.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/f361ee28_original_mb8sdz.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/40da0780_original_ejnbn8.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/ac75bf34_original_oyypfj.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/ef5477bd_original_iq1dhu.jpg"
   ]},
-  { label: "Skulptur IX", images: [
+  { label: "Skulptur IX",
+    title: "Blasphemous Revolt",
+    meta: "W 27 · H 35 · D 20,5 cm\nMixed Media Assemblage",
+    images: [
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651177/cf2f3e92_original_zkz5um.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/17df5f86_original_zmftxa.jpg",
     "https://res.cloudinary.com/diybhptdl/image/upload/v1773651178/e9813ac0_original_ycchfw.jpg",
@@ -581,10 +643,6 @@ function buildCluster(ci) {
   });
 
   org.appendChild(poreWrap);
-
-  const lbl = document.createElement('div');
-  lbl.className = 'cluster-label'; lbl.textContent = c.label;
-  org.appendChild(lbl);
   div.appendChild(org);
   return div;
 }
@@ -625,6 +683,10 @@ function imgDone() {
 
 function showGallery() {
   loaderText.textContent = 'enter';
+  // set initial info
+  const c = clusters[0];
+  infoTitle.textContent = c.title || '';
+  infoMeta.innerHTML = (c.meta || '').replace(/\n/g, '<br>');
   setTimeout(() => {
     loaderEl.classList.add('fade-out');
     mainUI.classList.add('visible');
@@ -663,10 +725,22 @@ function navigate(dir) {
   }, 900);
 }
 
+const infoPanel = document.getElementById('info-panel');
+const infoTitle = document.getElementById('info-title');
+const infoMeta  = document.getElementById('info-meta');
+
 function updateUI() {
   document.getElementById('cnt-cur').textContent = current + 1;
   prevBtn.disabled = current === 0;
   nextBtn.disabled = current === clusters.length - 1;
+  // fade info panel
+  infoPanel.classList.add('transitioning');
+  setTimeout(() => {
+    const c = clusters[current];
+    infoTitle.textContent = c.title || '';
+    infoMeta.innerHTML = (c.meta || '').replace(/\n/g, '<br>');
+    infoPanel.classList.remove('transitioning');
+  }, 250);
 }
 prevBtn.addEventListener('click', () => navigate(-1));
 nextBtn.addEventListener('click', () => navigate(1));
