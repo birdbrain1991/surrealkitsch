@@ -1244,7 +1244,7 @@ function startIntro() {
       box.getSize(size); box.getCenter(center);
       console.log('GLB size:', size);
 
-      const scale = 2.64 / Math.max(size.x, size.y, size.z);
+      const scale = 3.17 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale);
       model.position.set(-center.x * scale, 0, -center.z * scale);
       model.rotation.x = -Math.PI / 2;
@@ -1254,7 +1254,7 @@ function startIntro() {
       eyeR.position.set( 0.2, -0.8, 0.4);
     }, undefined, (err) => {
       console.error('GLB error:', err);
-      const fb = new THREE.Mesh(new THREE.BoxGeometry(2.5,0.5,1), new THREE.MeshBasicMaterial({color:0xff0000}));
+      const fb = new THREE.Mesh(new THREE.BoxGeometry(3.17,0.5,1.2), new THREE.MeshBasicMaterial({color:0xff0000}));
       fb.position.set(0, -2.5, 0); scene.add(fb);
     });
   };
