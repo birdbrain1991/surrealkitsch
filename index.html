@@ -1183,15 +1183,28 @@ function startIntro() {
   wBox(1.5,1.5,1.5, -4,-2.4, -5, 0.2);
   wBox(2.5,2,  2.5,  5,-2.1, -6,-0.3);
 
-  // Central coffin – long, alien lies along X axis
+  // Central coffin – open top so alien visible from above
   const cW=4.8, cH=3.2, cD=4.8;
-  const coffinTopY = -2.1 + 3.2/2;
-  const coffinFloorY = -2.1 - 3.2/2;
+  const coffinTopY = -2.1 + cH/2;    // = -0.5
+  const coffinFloorY = -2.1 - cH/2;  // = -3.7
+  const cy = -2.1;
+
+  // 5-sided open box (no top face)
+  function coffinSide(w,h,x,y,z,rx,ry) {
+    const g=new THREE.PlaneGeometry(w,h);
+    const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial({color:0x08100a,side:THREE.DoubleSide}));
+    m.position.set(x,y,z); m.rotation.set(rx,ry,0); scene.add(m);
+  }
+  coffinSide(cW, cD,  0, coffinFloorY, 0,  -Math.PI/2, 0);       // floor
+  coffinSide(cW, cH,  0, cy,  cD/2,    0,   Math.PI,   0);       // front
+  coffinSide(cW, cH,  0, cy, -cD/2,    0,   0,         0);       // back
+  coffinSide(cD, cH, -cW/2, cy, 0,     0,  -Math.PI/2, 0);       // left
+  coffinSide(cD, cH,  cW/2, cy, 0,     0,   Math.PI/2, 0);       // right
+
+  // Gold wireframe outline
   const cGeo=new THREE.BoxGeometry(cW,cH,cD);
-  const cMesh=new THREE.Mesh(cGeo,mDark);
-  cMesh.position.set(0,-2.1,0); scene.add(cMesh);
   const cEdge=new THREE.LineSegments(new THREE.EdgesGeometry(cGeo),lGold);
-  cEdge.position.set(0,-2.1,0); scene.add(cEdge);
+  cEdge.position.set(0,cy,0); scene.add(cEdge);
 
   // Coffin interior base
   const iGeo=new THREE.PlaneGeometry(cW-0.3,cD-0.3);
@@ -1212,7 +1225,7 @@ function startIntro() {
   // ── ALIEN lying on back, head at -X ─────────────────────────────────────
   const ag=new THREE.Group();
   // no rotation needed   // body axis now along world X
-  ag.position.set(0,-5.18,0);
+  ag.position.set(0,-2.5,0);
   scene.add(ag);
 
   // ── LOAD GLB MODEL ────────────────────────────────────────────────────────
@@ -1241,8 +1254,8 @@ function startIntro() {
       eyeR.position.set( 0.2, -0.8, 0.4);
     }, undefined, (err) => {
       console.error('GLB error:', err);
-      const fb = new THREE.Mesh(new THREE.BoxGeometry(1,2,0.5), new THREE.MeshBasicMaterial({color:0xff0000}));
-      fb.position.set(0,-1.5,0); scene.add(fb);
+      const fb = new THREE.Mesh(new THREE.BoxGeometry(2.5,0.5,1), new THREE.MeshBasicMaterial({color:0xff0000}));
+      fb.position.set(0, -2.5, 0); scene.add(fb);
     });
   };
 
