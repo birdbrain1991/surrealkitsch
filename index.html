@@ -293,17 +293,16 @@ function makeOrganismSVG(ci) {
   const poresSVG = pores.slice(0, clusters[ci].images.length).map((p, i) => {
     const url = clusters[ci].images[i];
     if (!url) return '';
-    const thumb = thumbUrl(url);
     const delay = (i * 0.28).toFixed(2);
     return `
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+10}" fill="url(#pr${ci}_${i})" style="filter:drop-shadow(0 0 7px rgba(140,25,15,0.65))"/>
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+2}" fill="none" stroke="#250808" stroke-width="2.5"/>
-      <image href="${thumb}"
+      <image href=""
         x="${p.cx-p.r}" y="${p.cy-p.r}" width="${p.r*2}" height="${p.r*2}"
         clip-path="url(#pc${ci}_${i})"
         preserveAspectRatio="xMidYMid slice"
-        style="animation-delay:${delay}s"
-        class="pore-img"/>
+        style="animation-delay:${delay}s;opacity:0;transition:opacity 0.4s ease"
+        class="pore-img" data-src="${thumbUrl(url)}"/>
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r}"
         fill="transparent" style="cursor:pointer"
         class="pore-hit" data-ci="${ci}" data-idx="${i}"/>`;
@@ -414,64 +413,58 @@ const nextBtn = document.getElementById('next-btn');
 document.getElementById('cnt-tot').textContent = clusters.length;
 
 // ── IMAGE CACHE & PRELOADER ───────────────────────────────────────────────
-const imageCache = new Map();
+const imageCache = new Map(); // url → true when loaded
+
+function thumbUrl(url) { return url.replace('/upload/', '/upload/w_300,q_auto,f_auto/'); }
+function hiUrl(url)    { return url.replace('/upload/', '/upload/w_1400,q_auto,f_auto/'); }
 
 function preloadImage(url) {
+  if (imageCache.get(url) === true) return Promise.resolve(url);
   if (imageCache.has(url)) return imageCache.get(url);
-  const promise = new Promise(resolve => {
+  const p = new Promise(resolve => {
     const img = new Image();
-    img.onload = () => resolve(url);
-    img.onerror = () => resolve(url); // resolve anyway, don't block
+    img.onload = img.onerror = () => { imageCache.set(url, true); resolve(url); };
     img.src = url;
   });
-  imageCache.set(url, promise);
-  return promise;
+  imageCache.set(url, p);
+  return p;
 }
 
-function thumbUrl(url) {
-  return url.replace('/upload/', '/upload/w_300,q_auto,f_auto/');
-}
-function hiUrl(url) {
-  return url.replace('/upload/', '/upload/w_1400,q_auto,f_auto/');
-}
-
-// Preload thumbnails for cluster i
-function preloadCluster(ci) {
-  clusters[ci].images.forEach(url => preloadImage(thumbUrl(url)));
+// Preload all thumbs for a cluster, then inject hrefs into already-built SVG images
+function preloadAndInject(ci) {
+  const urls = clusters[ci].images.map(thumbUrl);
+  const promises = urls.map(preloadImage);
+  Promise.all(promises).then(() => injectHrefs(ci));
 }
 
-// Wait for all thumbs of a cluster to be loaded
-function clusterReady(ci) {
-  return Promise.all(clusters[ci].images.map(url => preloadImage(thumbUrl(url))));
+function injectHrefs(ci) {
+  const el = wrap.querySelector(`.cluster[data-ci="${ci}"]`);
+  if (!el) return;
+  el.querySelectorAll('.pore-img').forEach(img => {
+    const src = img.dataset.src;
+    if (src && !img.getAttribute('href')) {
+      img.setAttribute('href', src);
+      // fade in once browser has painted the image
+      requestAnimationFrame(() => { img.style.opacity = '1'; });
+    }
+  });
 }
 
-// Start: preload current + next cluster immediately, then rest in background
-preloadCluster(0);
-preloadCluster(1);
-setTimeout(() => {
-  for (let i = 2; i < clusters.length; i++) preloadCluster(i);
-}, 800);
+// Staggered preload: cluster 0+1 immediately, rest spread over time
+preloadAndInject(0);
+preloadAndInject(1);
+for (let i = 2; i < clusters.length; i++) {
+  setTimeout(() => preloadAndInject(i), i * 300);
+}
 
-// ── BUILD & INIT CLUSTERS ─────────────────────────────────────────────────
 clusters.forEach((_, i) => {
   const el = buildCluster(i);
   el.classList.add(i === 0 ? 'state-current' : 'state-behind');
-  // mark not-yet-loaded clusters
-  if (i > 1) el.dataset.preloaded = 'false';
   wrap.appendChild(el);
 });
-
-// Swap in real image srcs once preloaded (for clusters built before cache was warm)
-function applyCachedImages(ci) {
-  const el = wrap.querySelector(`.cluster[data-ci="${ci}"]`);
-  if (!el || el.dataset.preloaded === 'true') return;
-  el.querySelectorAll('.pore-img').forEach(img => {
-    // force browser to use cached version by re-assigning href
-    const src = img.getAttribute('href');
-    if (src) { img.setAttribute('href', src + '?c=1'); img.setAttribute('href', src); }
-  });
-  el.dataset.preloaded = 'true';
-}
+// inject for cluster 0+1 which are now in DOM
+injectHrefs(0);
+injectHrefs(1);
 
 function getEl(i) { return wrap.querySelector(`.cluster[data-ci="${i}"]`); }
 
@@ -481,9 +474,10 @@ function navigate(dir) {
   if (next < 0 || next >= clusters.length) return;
   animating = true;
 
-  // preload the one after next in background
-  const preloadAhead = next + dir;
-  if (preloadAhead >= 0 && preloadAhead < clusters.length) preloadCluster(preloadAhead);
+  // ensure next cluster images are injected, and preload one further ahead
+  preloadAndInject(next);
+  const ahead = next + dir;
+  if (ahead >= 0 && ahead < clusters.length) preloadAndInject(ahead);
 
   const curEl = getEl(current), nxtEl = getEl(next);
   curEl.classList.remove('state-current');
@@ -498,7 +492,6 @@ function navigate(dir) {
     nxtEl.classList.add('state-current');
     nxtEl.style.opacity = ''; nxtEl.style.pointerEvents = '';
     current = next; updateUI(); animating = false;
-    applyCachedImages(next);
   }, 1000);
 }
 
