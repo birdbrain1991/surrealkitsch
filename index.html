@@ -63,13 +63,11 @@
   @keyframes specBreathe  { 0%{opacity:0.45} 45%{opacity:1}    100%{opacity:0.45} }
   @keyframes bumpBreathe  { 0%{opacity:0.65} 45%{opacity:1}    100%{opacity:0.65} }
 
-  .pore-fo { border-radius:50%; overflow:hidden; width:100%; height:100%; cursor:pointer;
-    animation:poreBreathe 3.8s ease-in-out infinite; transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
-  @keyframes poreBreathe { 0%{transform:scale(1)} 45%{transform:scale(1.04)} 100%{transform:scale(1)} }
-  .pore-fo:hover { transform:scale(1.13) !important; animation:none; }
-  .pore-fo img { width:100%; height:100%; object-fit:cover; border-radius:50%; display:block;
-    filter:saturate(0.75) brightness(0.82) contrast(1.08); transition:filter 0.3s; pointer-events:none; }
-  .pore-fo:hover img { filter:saturate(1.1) brightness(1.06) contrast(1.0); }
+  .pore-img {
+    filter: saturate(0.75) brightness(0.82) contrast(1.08);
+    transition: filter 0.3s ease;
+  }
+  .pore-hit { cursor: pointer; }
 
   .cluster-label { position:absolute; bottom:-52px; left:50%; transform:translateX(-50%);
     font-size:11px; letter-spacing:0.22em; text-transform:uppercase;
@@ -300,12 +298,15 @@ function makeOrganismSVG(ci) {
     return `
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+10}" fill="url(#pr${ci}_${i})" style="filter:drop-shadow(0 0 7px rgba(140,25,15,0.65))"/>
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+2}" fill="none" stroke="#250808" stroke-width="2.5"/>
-      <foreignObject x="${p.cx-p.r}" y="${p.cy-p.r}" width="${p.r*2}" height="${p.r*2}"
-        clip-path="url(#pc${ci}_${i})" data-ci="${ci}" data-idx="${i}" style="cursor:pointer;overflow:visible;">
-        <div xmlns="http://www.w3.org/1999/xhtml" class="pore-fo" style="animation-delay:${delay}s" data-ci="${ci}" data-idx="${i}">
-          <img src="${thumb}" alt="" loading="lazy">
-        </div>
-      </foreignObject>`;
+      <image href="${thumb}"
+        x="${p.cx-p.r}" y="${p.cy-p.r}" width="${p.r*2}" height="${p.r*2}"
+        clip-path="url(#pc${ci}_${i})"
+        preserveAspectRatio="xMidYMid slice"
+        style="animation-delay:${delay}s"
+        class="pore-img"/>
+      <circle cx="${p.cx}" cy="${p.cy}" r="${p.r}"
+        fill="transparent" style="cursor:pointer"
+        class="pore-hit" data-ci="${ci}" data-idx="${i}"/>`;
   }).join('');
 
   return `<svg viewBox="0 0 560 560" xmlns="http://www.w3.org/2000/svg">
@@ -378,8 +379,26 @@ function buildCluster(ci) {
   const org = document.createElement('div');
   org.className = 'organism';
   org.innerHTML = makeOrganismSVG(ci);
-  org.querySelectorAll('foreignObject').forEach(fo => {
-    fo.addEventListener('click', () => openLightbox(+fo.dataset.ci, +fo.dataset.idx));
+  org.querySelectorAll('.pore-hit').forEach(hit => {
+    hit.addEventListener('click', () => openLightbox(+hit.dataset.ci, +hit.dataset.idx));
+    // hover: scale up the preceding image
+    hit.addEventListener('mouseenter', () => {
+      const img = hit.previousElementSibling;
+      if (img && img.classList.contains('pore-img')) {
+        img.style.filter = 'saturate(1.1) brightness(1.05) contrast(1.0)';
+        img.style.transition = 'filter 0.3s';
+      }
+      hit.style.opacity = '0.15';
+      hit.style.fill = 'rgba(255,200,150,0.08)';
+    });
+    hit.addEventListener('mouseleave', () => {
+      const img = hit.previousElementSibling;
+      if (img && img.classList.contains('pore-img')) {
+        img.style.filter = '';
+      }
+      hit.style.opacity = '';
+      hit.style.fill = 'transparent';
+    });
   });
   const lbl = document.createElement('div');
   lbl.className = 'cluster-label'; lbl.textContent = c.label;
