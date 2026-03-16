@@ -69,6 +69,32 @@
   }
   .pore-hit { cursor: pointer; }
 
+  /* HTML pore image overlays */
+  .pore-html-wrap {
+    position: absolute; inset: 0;
+    pointer-events: none;
+  }
+  .pore-div {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    background-color: #1a0505;
+    clip-path: circle(50%);
+    cursor: pointer;
+    pointer-events: all;
+    filter: saturate(0.75) brightness(0.82) contrast(1.08);
+    transition: filter 0.3s ease;
+    animation: poreDivBreathe 3.8s ease-in-out infinite;
+  }
+  @keyframes poreDivBreathe {
+    0%   { transform: translate(-50%,-50%) scale(1); }
+    45%  { transform: translate(-50%,-50%) scale(1.04); }
+    100% { transform: translate(-50%,-50%) scale(1); }
+  }
+  /* clip-path keeps image inside circle even during scale */
+
   .cluster-label { position:absolute; bottom:-52px; left:50%; transform:translateX(-50%);
     font-size:11px; letter-spacing:0.22em; text-transform:uppercase;
     color:rgba(212,196,184,0.3); white-space:nowrap; font-style:italic; }
@@ -359,21 +385,10 @@ function makeOrganismSVG(ci) {
     </clipPath>`).join('');
 
   const poresSVG = pores.slice(0, clusters[ci].images.length).map((p, i) => {
-    const url = clusters[ci].images[i];
-    if (!url) return '';
-    const delay = (i * 0.28).toFixed(2);
+    if (!clusters[ci].images[i]) return '';
     return `
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+10}" fill="url(#pr${ci}_${i})" style="filter:drop-shadow(0 0 7px rgba(140,25,15,0.65))"/>
-      <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+2}" fill="none" stroke="#250808" stroke-width="2.5"/>
-      <image href=""
-        x="${p.cx-p.r}" y="${p.cy-p.r}" width="${p.r*2}" height="${p.r*2}"
-        clip-path="url(#pc${ci}_${i})"
-        preserveAspectRatio="xMidYMid slice"
-        style="animation-delay:${delay}s;opacity:0;transition:opacity 0.4s ease"
-        class="pore-img" data-src="${thumbUrl(url)}"/>
-      <circle cx="${p.cx}" cy="${p.cy}" r="${p.r}"
-        fill="transparent" style="cursor:pointer"
-        class="pore-hit" data-ci="${ci}" data-idx="${i}"/>`;
+      <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+2}" fill="none" stroke="#250808" stroke-width="2.5"/>`;
   }).join('');
 
   return `<svg viewBox="0 0 560 560" xmlns="http://www.w3.org/2000/svg">
@@ -441,32 +456,57 @@ function makeOrganismSVG(ci) {
 
 function buildCluster(ci) {
   const c = clusters[ci];
+  const n = c.images.length;
+  const pores = getLayout(n);
+
   const div = document.createElement('div');
   div.className = 'cluster'; div.dataset.ci = ci;
+
   const org = document.createElement('div');
   org.className = 'organism';
   org.innerHTML = makeOrganismSVG(ci);
-  org.querySelectorAll('.pore-hit').forEach(hit => {
-    hit.addEventListener('click', () => openLightbox(+hit.dataset.ci, +hit.dataset.idx));
-    // hover: scale up the preceding image
-    hit.addEventListener('mouseenter', () => {
-      const img = hit.previousElementSibling;
-      if (img && img.classList.contains('pore-img')) {
-        img.style.filter = 'saturate(1.1) brightness(1.05) contrast(1.0)';
-        img.style.transition = 'filter 0.3s';
-      }
-      hit.style.opacity = '0.15';
-      hit.style.fill = 'rgba(255,200,150,0.08)';
+
+  // HTML pore image overlays – positioned absolutely over SVG
+  // SVG viewBox is 560x560, organism div is min(540px,82vw)
+  const poreWrap = document.createElement('div');
+  poreWrap.className = 'pore-html-wrap';
+
+  pores.slice(0, n).forEach((p, i) => {
+    const url = c.images[i];
+    if (!url) return;
+    // positions are in SVG units (0-560), convert to %
+    const pct_x = (p.cx / 560 * 100).toFixed(3);
+    const pct_y = (p.cy / 560 * 100).toFixed(3);
+    const pct_r = (p.r  / 560 * 100).toFixed(3);
+    const delay = (i * 0.28).toFixed(2);
+
+    const poreDiv = document.createElement('div');
+    poreDiv.className = 'pore-div';
+    poreDiv.style.cssText = `
+      left:${pct_x}%;
+      top:${pct_y}%;
+      width:${pct_r*2}%;
+      height:${pct_r*2}%;
+      background-image:url('${thumbUrl(url)}');
+      animation-delay:${delay}s;
+    `;
+    poreDiv.dataset.ci  = ci;
+    poreDiv.dataset.idx = i;
+    poreDiv.dataset.src = thumbUrl(url);
+
+    poreDiv.addEventListener('click', () => openLightbox(ci, i));
+    poreDiv.addEventListener('mouseenter', () => {
+      poreDiv.style.filter = 'saturate(1.15) brightness(1.08)';
     });
-    hit.addEventListener('mouseleave', () => {
-      const img = hit.previousElementSibling;
-      if (img && img.classList.contains('pore-img')) {
-        img.style.filter = '';
-      }
-      hit.style.opacity = '';
-      hit.style.fill = 'transparent';
+    poreDiv.addEventListener('mouseleave', () => {
+      poreDiv.style.filter = '';
     });
+
+    poreWrap.appendChild(poreDiv);
   });
+
+  org.appendChild(poreWrap);
+
   const lbl = document.createElement('div');
   lbl.className = 'cluster-label'; lbl.textContent = c.label;
   org.appendChild(lbl);
@@ -501,11 +541,11 @@ function preloadImage(url) {
 function injectHrefs(ci) {
   const el = wrap.querySelector(`.cluster[data-ci="${ci}"]`);
   if (!el) return;
-  el.querySelectorAll('.pore-img').forEach(img => {
-    const src = img.dataset.src;
-    if (src && !img.getAttribute('href')) {
-      img.setAttribute('href', src);
-      requestAnimationFrame(() => { img.style.opacity = '1'; });
+  el.querySelectorAll('.pore-div').forEach(div => {
+    const src = div.dataset.src;
+    if (src && !div.dataset.injected) {
+      div.style.backgroundImage = `url('${src}')`;
+      div.dataset.injected = '1';
     }
   });
 }
