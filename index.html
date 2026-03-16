@@ -1183,43 +1183,40 @@ function startIntro() {
   wBox(1.5,1.5,1.5, -4,-2.4, -5, 0.2);
   wBox(2.5,2,  2.5,  5,-2.1, -6,-0.3);
 
-  // Central coffin – square, bigger, alien fits inside
-  // cH deep enough so alien sits inside with room
+  // Central coffin – long, alien lies along X axis
   const cW=4.8, cH=3.2, cD=4.8;
+  const coffinTopY = -2.1 + 3.2/2;
+  const coffinFloorY = -2.1 - 3.2/2;
   const cGeo=new THREE.BoxGeometry(cW,cH,cD);
   const cMesh=new THREE.Mesh(cGeo,mDark);
   cMesh.position.set(0,-2.1,0); scene.add(cMesh);
   const cEdge=new THREE.LineSegments(new THREE.EdgesGeometry(cGeo),lGold);
   cEdge.position.set(0,-2.1,0); scene.add(cEdge);
 
-  // Coffin top y = -2.1 + cH/2 = -0.5
-  const coffinTopY = -2.1 + cH/2;   // = -0.5
-  const coffinFloorY = -2.1 - cH/2; // = -3.7
-
   // Coffin interior base
   const iGeo=new THREE.PlaneGeometry(cW-0.3,cD-0.3);
   const iMesh=new THREE.Mesh(iGeo,new THREE.MeshLambertMaterial({color:0x0a0606}));
-  iMesh.rotation.x=-Math.PI/2; iMesh.position.set(0, coffinFloorY+0.02, 0); scene.add(iMesh);
+  iMesh.rotation.x=-Math.PI/2; iMesh.position.set(0,-3.7,0); scene.add(iMesh);
 
-  // Lid – pivot at back edge (Z = -cD/2), opens upward/backward away from camera
-  const lidGeo=new THREE.BoxGeometry(cW+0.12, 0.16, cD+0.12);
-  const lidM=new THREE.Mesh(lidGeo, new THREE.MeshLambertMaterial({color:0x0a1408}));
-  const lidE=new THREE.LineSegments(new THREE.EdgesGeometry(lidGeo), lGold);
+  // Lid – pivots from head end (-X side)
+  const lidGeo=new THREE.BoxGeometry(cW+0.12,0.16,cD+0.12);
+  const lidM=new THREE.Mesh(lidGeo,new THREE.MeshLambertMaterial({color:0x0a1408}));
+  const lidE=new THREE.LineSegments(new THREE.EdgesGeometry(lidGeo),lGold);
   const lidPivot=new THREE.Group();
-  // Pivot sits at back edge of coffin top
-  lidPivot.position.set(0, coffinTopY, -cD/2);
-  // Lid center is cD/2 forward from pivot
-  lidM.position.set(0, 0, cD/2);
-  lidE.position.set(0, 0, cD/2);
+  lidPivot.position.set(0,-0.5,-cD/2);
+  lidM.position.set(0,0,cD/2);
+  lidE.position.set(0,0,cD/2);
   lidPivot.add(lidM); lidPivot.add(lidE);
   scene.add(lidPivot);
 
-  // ── ALIEN inside coffin ───────────────────────────────────────────────────
+  // ── ALIEN lying on back, head at -X ─────────────────────────────────────
   const ag=new THREE.Group();
+  // no rotation needed   // body axis now along world X
+  ag.position.set(0,-5.18,0);
   scene.add(ag);
-  // ── LOAD ALIEN GLB FROM CLOUDINARY ──────────────────────────────────────
-  const GLB_URL = 'https://birdbrain1991.github.io/surrealkitsch/GLOBULON.glb';
 
+  // ── LOAD GLB MODEL ────────────────────────────────────────────────────────
+  const GLB_URL = 'https://birdbrain1991.github.io/surrealkitsch/GLOBULON.glb';
   const loaderScript = document.createElement('script');
   loaderScript.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
   document.head.appendChild(loaderScript);
@@ -1228,40 +1225,24 @@ function startIntro() {
     const loader = new THREE.GLTFLoader();
     loader.load(GLB_URL, (gltf) => {
       const model = gltf.scene;
-
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3();
       const center = new THREE.Vector3();
-      box.getSize(size);
-      box.getCenter(center);
-      console.log('GLB size:', size, 'center:', center);
+      box.getSize(size); box.getCenter(center);
+      console.log('GLB size:', size);
 
-      // Scale: 20% bigger than before → longest axis = 2.64
       const scale = 2.64 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale);
-
-      // After rotation.x = -PI/2, model's Y becomes Z
-      // Place alien so it sits inside the coffin box
       model.position.set(-center.x * scale, 0, -center.z * scale);
       model.rotation.x = -Math.PI / 2;
-      // ag sits at coffin floor
-      ag.position.set(0, -3.68 - 1.5, 0);
+      ag.add(model);
 
-      scene.add(model);
-
-      // Eye lights at head area (top of model when standing = front when lying)
-      const modelH = size.y * scale;
-      eyeL.position.set(-0.2, coffinFloorY + modelH * 0.25, modelH * 0.42);
-      eyeR.position.set( 0.2, coffinFloorY + modelH * 0.25, modelH * 0.42);
-
+      eyeL.position.set(-0.2, -0.8, 0.4);
+      eyeR.position.set( 0.2, -0.8, 0.4);
     }, undefined, (err) => {
       console.error('GLB error:', err);
-      const fb = new THREE.Mesh(
-        new THREE.BoxGeometry(1,2,0.5),
-        new THREE.MeshBasicMaterial({color:0xff0000})
-      );
-      fb.position.set(0,-1.5,0);
-      scene.add(fb);
+      const fb = new THREE.Mesh(new THREE.BoxGeometry(1,2,0.5), new THREE.MeshBasicMaterial({color:0xff0000}));
+      fb.position.set(0,-1.5,0); scene.add(fb);
     });
   };
 
@@ -1286,34 +1267,39 @@ function startIntro() {
     eyeL.intensity = eyeR.intensity = ep;
 
     if(t<3){
+      // Side establishing shot, drift in
       const p=eout(t/3);
       camera.position.set(lv(12,7,p), lv(5,3.8,p), lv(12,7,p));
-      camera.lookAt(0,-0.5,0);
+      camera.lookAt(0,-1.8,0);
       camera.fov=52; camera.updateProjectionMatrix();
     }
     if(t>=3&&t<5.5){
+      // Arc up over coffin
       const p=eio((t-3)/2.5);
       camera.position.set(lv(7,0.5,p), lv(3.8,15,p), lv(7,1,p));
       camera.lookAt(0,-1.85,0);
       camera.fov=lv(52,42,p); camera.updateProjectionMatrix();
-      // Lid opens upward rotating around X axis (pivot at back edge)
-      lidPivot.rotation.x = lv(0, -Math.PI * 0.85, p);
+      // Lid opens
+      lidPivot.rotation.x=lv(0,-Math.PI*0.85,p);
     }
     if(t>=5.5&&t<8){
+      // Top-down hold
       camera.position.set(0.5,15,1);
       camera.lookAt(0,-1.85,0);
       camera.fov=42; camera.updateProjectionMatrix();
-      if(lidPivot.rotation.x > -Math.PI*0.85) lidPivot.rotation.x = -Math.PI*0.85;
+      if(lidPivot.rotation.x>-Math.PI*0.85) lidPivot.rotation.x=-Math.PI*0.85;
     }
     if(t>=8&&t<12){
       const p=ein((t-8)/4);
-      // Chest in world: alien local y=0.28 → world y = -2.0+0.28 = -1.72, z=0.44
+      // Descend from top into chest area
+      // Chest in world coords: alien rotated z=90°, local (x=0,y=0.28,z=0.44)
+      // → world: x=-0.28, y=-2.92+0=−2.92? Let's target world ~(0, -2.65, 0.44)
       camera.position.set(
-        lv(0.5, 0,    p),
-        lv(15,  0.5,  p),
-        lv(1,   0.44, p)
+        lv(0.5,  0,    p),
+        lv(15,   -1.2, p),
+        lv(1,    0.44, p)
       );
-      camera.lookAt(lv(0,0,p), lv(-1.85,-1.72,p), lv(0,0.44,p));
+      camera.lookAt(lv(0,0,p), lv(-1.85,-2.65,p), lv(0,0.44,p));
       camera.fov=lv(42,12,p); camera.updateProjectionMatrix();
       if(p>0.80) canvas.style.opacity=lv(1,0,(p-0.80)/0.20).toString();
     }
