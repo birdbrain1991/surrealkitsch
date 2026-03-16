@@ -521,53 +521,31 @@ document.getElementById('cnt-tot').textContent = clusters.length;
 function thumbUrl(url) { return url.replace('/upload/', '/upload/w_300,q_auto,f_auto/'); }
 function hiUrl(url)    { return url.replace('/upload/', '/upload/w_1400,q_auto,f_auto/'); }
 
-// ── IMAGE CACHE ───────────────────────────────────────────────────────────
-const imageCache = new Map();
-function preloadImage(url) {
-  if (imageCache.get(url) === true) return Promise.resolve(url);
-  if (imageCache.has(url)) return imageCache.get(url);
-  const p = new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      // force full decode so browser won't lazy-decode later
-      if (img.decode) {
-        img.decode().then(() => { imageCache.set(url, true); resolve(url); })
-                    .catch(() => { imageCache.set(url, true); resolve(url); });
-      } else {
-        imageCache.set(url, true); resolve(url);
-      }
-    };
-    img.onerror = () => { imageCache.set(url, true); resolve(url); };
-    img.src = url;
-  });
-  imageCache.set(url, p);
-  return p;
-}
+// ── BUILD ALL CLUSTERS IMMEDIATELY ───────────────────────────────────────
+// img.src is set right away – browser loads and caches automatically
+clusters.forEach((_, i) => {
+  const el = buildCluster(i);
+  el.classList.add(i === 0 ? 'state-current' : 'state-behind');
+  wrap.appendChild(el);
+});
 
-// ── LOADING SCREEN ────────────────────────────────────────────────────────
+// ── LOADING SCREEN – wait for all img tags to actually load ───────────────
 const loaderBar  = document.getElementById('loader-bar');
 const loaderText = document.getElementById('loader-text');
 const loaderEl   = document.getElementById('loader');
 const mainUI     = document.getElementById('main-ui');
 
-const allThumbs = clusters.flatMap(c => c.images.map(thumbUrl));
-const total = allThumbs.length;
+const allImgs = Array.from(wrap.querySelectorAll('.pore-div img'));
+const total = allImgs.length;
 let loaded = 0;
 
-function onOneLoaded() {
+function imgDone() {
   loaded++;
-  loaderBar.style.width = Math.round((loaded / total) * 100) + '%';
-  if (loaded === total) onAllLoaded();
+  loaderBar.style.width = Math.round(loaded / total * 100) + '%';
+  if (loaded === total) showGallery();
 }
 
-function onAllLoaded() {
-  // NOW build clusters – all images are guaranteed in browser cache
-  clusters.forEach((_, i) => {
-    const el = buildCluster(i);
-    el.classList.add(i === 0 ? 'state-current' : 'state-behind');
-    wrap.appendChild(el);
-  });
-
+function showGallery() {
   loaderText.textContent = 'enter';
   setTimeout(() => {
     loaderEl.classList.add('fade-out');
@@ -576,8 +554,13 @@ function onAllLoaded() {
   }, 300);
 }
 
-// Start all preloads in parallel
-allThumbs.forEach(url => preloadImage(url).then(onOneLoaded));
+allImgs.forEach(img => {
+  if (img.complete) { imgDone(); }
+  else { img.addEventListener('load',  imgDone); img.addEventListener('error', imgDone); }
+});
+
+// fallback: show gallery after 8s max regardless
+setTimeout(() => { if (loaded < total) showGallery(); }, 8000);
 
 function getEl(i) { return wrap.querySelector(`.cluster[data-ci="${i}"]`); }
 
@@ -617,14 +600,8 @@ const lbImg = document.getElementById('lb-img');
 
 function openLightbox(ci, idx) {
   lbCluster = ci; lbIndex = idx;
-  const hi = hiUrl(clusters[ci].images[idx]);
-  lbImg.src = hi;
+  lbImg.src = hiUrl(clusters[ci].images[idx]);
   lb.classList.add('open'); updateLbNav();
-  // preload adjacent hi-res images
-  const prev = clusters[ci].images[idx-1];
-  const next = clusters[ci].images[idx+1];
-  if (prev) preloadImage(hiUrl(prev));
-  if (next) preloadImage(hiUrl(next));
 }
 function closeLightbox() { lb.classList.remove('open'); }
 function updateLbNav() {
