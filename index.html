@@ -485,8 +485,8 @@ function buildCluster(ci) {
     poreDiv.style.cssText = `
       left:${pct_x}%;
       top:${pct_y}%;
-      width:${pct_r*2}%;
-      height:${pct_r*2}%;
+      width:${(pct_r*2).toFixed(3)}%;
+      height:${(pct_r*2).toFixed(3)}%;
       background-image:url('${thumbUrl(url)}');
       animation-delay:${delay}s;
     `;
@@ -520,12 +520,12 @@ const prevBtn = document.getElementById('prev-btn');
 const nextBtn = document.getElementById('next-btn');
 document.getElementById('cnt-tot').textContent = clusters.length;
 
-// ── IMAGE CACHE & PRELOADER ───────────────────────────────────────────────
-const imageCache = new Map();
-
+// ── URL HELPERS (defined first, used everywhere) ──────────────────────────
 function thumbUrl(url) { return url.replace('/upload/', '/upload/w_300,q_auto,f_auto/'); }
 function hiUrl(url)    { return url.replace('/upload/', '/upload/w_1400,q_auto,f_auto/'); }
 
+// ── IMAGE CACHE ───────────────────────────────────────────────────────────
+const imageCache = new Map();
 function preloadImage(url) {
   if (imageCache.get(url) === true) return Promise.resolve(url);
   if (imageCache.has(url)) return imageCache.get(url);
@@ -538,64 +538,40 @@ function preloadImage(url) {
   return p;
 }
 
-function injectHrefs(ci) {
-  const el = wrap.querySelector(`.cluster[data-ci="${ci}"]`);
-  if (!el) return;
-  el.querySelectorAll('.pore-div').forEach(div => {
-    const src = div.dataset.src;
-    if (src && !div.dataset.injected) {
-      div.style.backgroundImage = `url('${src}')`;
-      div.dataset.injected = '1';
-    }
-  });
-}
-
-function preloadAndInject(ci) {
-  const urls = clusters[ci].images.map(thumbUrl);
-  return Promise.all(urls.map(preloadImage)).then(() => injectHrefs(ci));
-}
-
 // ── LOADING SCREEN ────────────────────────────────────────────────────────
 const loaderBar  = document.getElementById('loader-bar');
 const loaderText = document.getElementById('loader-text');
 const loaderEl   = document.getElementById('loader');
 const mainUI     = document.getElementById('main-ui');
 
-// Build all cluster DOM first (images hidden, href empty)
-clusters.forEach((_, i) => {
-  const el = buildCluster(i);
-  el.classList.add(i === 0 ? 'state-current' : 'state-behind');
-  wrap.appendChild(el);
-});
-
-// Count total images
 const allThumbs = clusters.flatMap(c => c.images.map(thumbUrl));
 const total = allThumbs.length;
 let loaded = 0;
 
 function onOneLoaded() {
   loaded++;
-  const pct = Math.round((loaded / total) * 100);
-  loaderBar.style.width = pct + '%';
+  loaderBar.style.width = Math.round((loaded / total) * 100) + '%';
   if (loaded === total) onAllLoaded();
 }
 
 function onAllLoaded() {
-  // inject all hrefs now that everything is cached
-  clusters.forEach((_, i) => injectHrefs(i));
+  // NOW build clusters – all images are guaranteed in browser cache
+  clusters.forEach((_, i) => {
+    const el = buildCluster(i);
+    el.classList.add(i === 0 ? 'state-current' : 'state-behind');
+    wrap.appendChild(el);
+  });
+
   loaderText.textContent = 'enter';
-  // short pause then fade out loader, fade in UI
   setTimeout(() => {
     loaderEl.classList.add('fade-out');
     mainUI.classList.add('visible');
     setTimeout(() => { loaderEl.style.display = 'none'; }, 900);
-  }, 400);
+  }, 300);
 }
 
-// Kick off all preloads in parallel, each calls onOneLoaded when done
-allThumbs.forEach(url => {
-  preloadImage(url).then(onOneLoaded);
-});
+// Start all preloads in parallel
+allThumbs.forEach(url => preloadImage(url).then(onOneLoaded));
 
 function getEl(i) { return wrap.querySelector(`.cluster[data-ci="${i}"]`); }
 
