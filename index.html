@@ -105,7 +105,74 @@
 <body>
 
 <canvas id="bg-canvas"></canvas>
- href="https://birdbrain1991.github.io/vault/">Vault</a>
+
+<!-- LOADING SCREEN -->
+<div id="loader">
+  <div id="loader-inner">
+    <div id="loader-organism">
+      <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="lg" cx="38%" cy="32%" r="65%">
+            <stop offset="0%" stop-color="#6e2020"/>
+            <stop offset="50%" stop-color="#300a0a"/>
+            <stop offset="100%" stop-color="#0d0303"/>
+          </radialGradient>
+          <filter id="lf">
+            <feTurbulence type="fractalNoise" baseFrequency="0.065" numOctaves="4" seed="3" result="n"/>
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G"/>
+          </filter>
+        </defs>
+        <ellipse cx="60" cy="60" rx="50" ry="50" fill="url(#lg)" filter="url(#lf)" class="loader-blob"/>
+      </svg>
+    </div>
+    <div id="loader-bar-wrap">
+      <div id="loader-bar"></div>
+    </div>
+    <div id="loader-text">loading</div>
+  </div>
+</div>
+
+<style>
+  #loader {
+    position: fixed; inset: 0; z-index: 1000;
+    background: #060306;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.8s ease;
+  }
+  #loader.fade-out { opacity: 0; pointer-events: none; }
+  #loader-inner { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  #loader-organism { width: 90px; height: 90px; }
+  .loader-blob {
+    transform-origin: 60px 60px;
+    animation: loaderPulse 1.8s ease-in-out infinite;
+  }
+  @keyframes loaderPulse {
+    0%   { transform: scale(1);     opacity: 0.8; }
+    50%  { transform: scale(1.08);  opacity: 1;   }
+    100% { transform: scale(1);     opacity: 0.8; }
+  }
+  #loader-bar-wrap {
+    width: 160px; height: 1px;
+    background: rgba(212,196,184,0.12);
+    position: relative; overflow: hidden;
+  }
+  #loader-bar {
+    position: absolute; left: 0; top: 0; height: 100%;
+    width: 0%; background: rgba(212,196,184,0.55);
+    transition: width 0.3s ease;
+  }
+  #loader-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+    color: rgba(212,196,184,0.35);
+  }
+  /* Main UI hidden until load complete */
+  #main-ui { opacity: 0; transition: opacity 0.8s ease; }
+  #main-ui.visible { opacity: 1; }
+</style>
+
+<div id="main-ui">
+<a id="back-btn" href="https://birdbrain1991.github.io/vault/">Vault</a>
 <div id="counter"><span id="cnt-cur">1</span> / <span id="cnt-tot">9</span></div>
 <div id="stage"><div id="cluster-wrap"></div></div>
 <button class="nav-btn" id="prev-btn" disabled>Prev</button>
@@ -116,6 +183,7 @@
   <img id="lb-img" src="" alt="">
   <button class="lb-nav" id="lb-next">Next</button>
 </div>
+</div><!-- /main-ui -->
 
 <script>
 const clusters = [
@@ -413,7 +481,7 @@ const nextBtn = document.getElementById('next-btn');
 document.getElementById('cnt-tot').textContent = clusters.length;
 
 // ── IMAGE CACHE & PRELOADER ───────────────────────────────────────────────
-const imageCache = new Map(); // url → true when loaded
+const imageCache = new Map();
 
 function thumbUrl(url) { return url.replace('/upload/', '/upload/w_300,q_auto,f_auto/'); }
 function hiUrl(url)    { return url.replace('/upload/', '/upload/w_1400,q_auto,f_auto/'); }
@@ -430,13 +498,6 @@ function preloadImage(url) {
   return p;
 }
 
-// Preload all thumbs for a cluster, then inject hrefs into already-built SVG images
-function preloadAndInject(ci) {
-  const urls = clusters[ci].images.map(thumbUrl);
-  const promises = urls.map(preloadImage);
-  Promise.all(promises).then(() => injectHrefs(ci));
-}
-
 function injectHrefs(ci) {
   const el = wrap.querySelector(`.cluster[data-ci="${ci}"]`);
   if (!el) return;
@@ -444,27 +505,57 @@ function injectHrefs(ci) {
     const src = img.dataset.src;
     if (src && !img.getAttribute('href')) {
       img.setAttribute('href', src);
-      // fade in once browser has painted the image
       requestAnimationFrame(() => { img.style.opacity = '1'; });
     }
   });
 }
 
-// Staggered preload: cluster 0+1 immediately, rest spread over time
-preloadAndInject(0);
-preloadAndInject(1);
-for (let i = 2; i < clusters.length; i++) {
-  setTimeout(() => preloadAndInject(i), i * 300);
+function preloadAndInject(ci) {
+  const urls = clusters[ci].images.map(thumbUrl);
+  return Promise.all(urls.map(preloadImage)).then(() => injectHrefs(ci));
 }
 
+// ── LOADING SCREEN ────────────────────────────────────────────────────────
+const loaderBar  = document.getElementById('loader-bar');
+const loaderText = document.getElementById('loader-text');
+const loaderEl   = document.getElementById('loader');
+const mainUI     = document.getElementById('main-ui');
+
+// Build all cluster DOM first (images hidden, href empty)
 clusters.forEach((_, i) => {
   const el = buildCluster(i);
   el.classList.add(i === 0 ? 'state-current' : 'state-behind');
   wrap.appendChild(el);
 });
-// inject for cluster 0+1 which are now in DOM
-injectHrefs(0);
-injectHrefs(1);
+
+// Count total images
+const allThumbs = clusters.flatMap(c => c.images.map(thumbUrl));
+const total = allThumbs.length;
+let loaded = 0;
+
+function onOneLoaded() {
+  loaded++;
+  const pct = Math.round((loaded / total) * 100);
+  loaderBar.style.width = pct + '%';
+  if (loaded === total) onAllLoaded();
+}
+
+function onAllLoaded() {
+  // inject all hrefs now that everything is cached
+  clusters.forEach((_, i) => injectHrefs(i));
+  loaderText.textContent = 'enter';
+  // short pause then fade out loader, fade in UI
+  setTimeout(() => {
+    loaderEl.classList.add('fade-out');
+    mainUI.classList.add('visible');
+    setTimeout(() => { loaderEl.style.display = 'none'; }, 900);
+  }, 400);
+}
+
+// Kick off all preloads in parallel, each calls onOneLoaded when done
+allThumbs.forEach(url => {
+  preloadImage(url).then(onOneLoaded);
+});
 
 function getEl(i) { return wrap.querySelector(`.cluster[data-ci="${i}"]`); }
 
@@ -473,12 +564,6 @@ function navigate(dir) {
   const next = current + dir;
   if (next < 0 || next >= clusters.length) return;
   animating = true;
-
-  // ensure next cluster images are injected, and preload one further ahead
-  preloadAndInject(next);
-  const ahead = next + dir;
-  if (ahead >= 0 && ahead < clusters.length) preloadAndInject(ahead);
-
   const curEl = getEl(current), nxtEl = getEl(next);
   curEl.classList.remove('state-current');
   nxtEl.classList.remove('state-behind','state-front','state-current');
