@@ -391,7 +391,7 @@ function makeOrganismSVG(ci) {
   const poresSVG = pores.slice(0, clusters[ci].images.length).map((p, i) => {
     if (!clusters[ci].images[i]) return '';
     return `
-      <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+10}" fill="url(#pr${ci}_${i})" style="filter:drop-shadow(0 0 7px rgba(140,25,15,0.65))"/>
+      <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+10}" fill="url(#pr${ci}_${i})"/>
       <circle cx="${p.cx}" cy="${p.cy}" r="${p.r+2}" fill="none" stroke="#250808" stroke-width="2.5"/>`;
   }).join('');
 
@@ -404,26 +404,26 @@ function makeOrganismSVG(ci) {
       <stop offset="78%"  stop-color="#1c0606"/>
       <stop offset="100%" stop-color="#0d0303"/>
     </radialGradient>
-    <filter id="cellTex${ci}" x="-2%" y="-2%" width="104%" height="104%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.042 0.036" numOctaves="6" seed="${12+ci}" result="coarse"/>
-      <feTurbulence type="fractalNoise" baseFrequency="0.19 0.16"   numOctaves="3" seed="${5+ci}"  result="fine"/>
-      <feMerge result="tex"><feMergeNode in="coarse"/><feMergeNode in="fine"/></feMerge>
-      <feColorMatrix type="saturate" values="0" result="gray"/>
-      <feBlend in="SourceGraphic" in2="gray" mode="multiply" result="blended"/>
-      <feComponentTransfer>
-        <feFuncR type="gamma" amplitude="1.15" exponent="0.82" offset="0"/>
-        <feFuncG type="gamma" amplitude="0.55" exponent="1.25" offset="0"/>
-        <feFuncB type="gamma" amplitude="0.55" exponent="1.25" offset="0"/>
-      </feComponentTransfer>
-    </filter>
-    <filter id="softBlur${ci}"><feGaussianBlur stdDeviation="16"/></filter>
-    <filter id="bumpShadow${ci}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#000" flood-opacity="0.72"/></filter>
+    <radialGradient id="fleshMid${ci}" cx="55%" cy="60%" r="55%">
+      <stop offset="0%"   stop-color="rgba(90,18,18,0.45)"/>
+      <stop offset="60%"  stop-color="rgba(40,8,8,0.2)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="specGrad${ci}" cx="34%" cy="28%" r="50%">
+      <stop offset="0%"   stop-color="rgba(255,200,180,0.10)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <radialGradient id="shadowGrad${ci}" cx="62%" cy="68%" r="48%">
+      <stop offset="0%"   stop-color="rgba(0,0,0,0.42)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
     <clipPath id="blobClip${ci}"><path d="${BLOB_PATH}"/></clipPath>
     ${poreDefs}
     ${bumpDefs}
   </defs>
   <g clip-path="url(#blobClip${ci})">
-    <path d="${BLOB_PATH}" fill="url(#fleshBase${ci})" filter="url(#cellTex${ci})"/>
+    <path d="${BLOB_PATH}" fill="url(#fleshBase${ci})"/>
+    <path d="${BLOB_PATH}" fill="url(#fleshMid${ci})"/>
     <g class="vein-layer" stroke="#0e0202" stroke-width="1.4" fill="none">
       <path d="M180,80 Q210,110 230,150 Q248,185 240,230"/>
       <path d="M290,60 Q310,100 320,145 Q328,185 310,225"/>
@@ -449,10 +449,9 @@ function makeOrganismSVG(ci) {
       <path d="M138,222 Q156,278 166,332 Q174,378 188,418"/>
       <path d="M414,232 Q406,290 392,340 Q380,384 352,422"/>
     </g>
-    <g class="bumps-layer" filter="url(#bumpShadow${ci})">${bumpCircles}</g>
-    <ellipse class="spec-layer" cx="208" cy="162" rx="108" ry="78" fill="rgba(255,200,180,0.08)" filter="url(#softBlur${ci})"/>
-    <ellipse class="spec-layer" cx="192" cy="146" rx="52"  ry="36" fill="rgba(255,225,205,0.10)" filter="url(#softBlur${ci})"/>
-    <ellipse cx="362" cy="392" rx="128" ry="92" fill="rgba(0,0,0,0.38)" filter="url(#softBlur${ci})"/>
+    <g class="bumps-layer">${bumpCircles}</g>
+    <path d="${BLOB_PATH}" fill="url(#specGrad${ci})"/>
+    <path d="${BLOB_PATH}" fill="url(#shadowGrad${ci})"/>
     ${poresSVG}
   </g>
 </svg>`;
