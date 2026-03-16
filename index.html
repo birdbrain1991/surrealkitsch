@@ -1271,52 +1271,44 @@ function startIntro() {
   function animate(){
     if(!window._introRunning) return;
     requestAnimationFrame(animate);
-    t+=1.6/60;
+    t+=2.8/60;
     if(t>TOTAL&&!done){ done=true; revealGallery(); return; }
     if(done) return;
 
-    // Eye pulse
     const ep = 1.6+0.6*Math.sin(t*1.6);
     eyeL.intensity = eyeR.intensity = ep;
 
-    if(t<3){
-      // Side establishing shot, drift in
-      const p=eout(t/3);
-      camera.position.set(lv(12,7,p), lv(5,3.8,p), lv(12,7,p));
-      camera.lookAt(0,-1.8,0);
-      camera.fov=52; camera.updateProjectionMatrix();
-    }
-    if(t>=3&&t<5.5){
-      // Arc up over coffin
-      const p=eio((t-3)/2.5);
-      camera.position.set(lv(7,0.5,p), lv(3.8,15,p), lv(7,1,p));
-      camera.lookAt(0,-1.85,0);
-      camera.fov=lv(52,42,p); camera.updateProjectionMatrix();
-      // Lid opens
-      lidPivot.rotation.x=lv(0,-Math.PI*0.85,p);
-    }
-    if(t>=5.5&&t<8){
-      // Top-down hold
-      camera.position.set(0.5,15,1);
-      camera.lookAt(0,-1.85,0);
-      camera.fov=42; camera.updateProjectionMatrix();
-      if(lidPivot.rotation.x>-Math.PI*0.85) lidPivot.rotation.x=-Math.PI*0.85;
-    }
-    if(t>=8&&t<12){
-      const p=ein((t-8)/4);
-      // Descend from top into chest area
-      // Chest in world coords: alien rotated z=90°, local (x=0,y=0.28,z=0.44)
-      // → world: x=-0.28, y=-2.92+0=−2.92? Let's target world ~(0, -2.65, 0.44)
-      camera.position.set(
-        lv(0.5,  0,    p),
-        lv(15,   -1.2, p),
-        lv(1,    0.44, p)
-      );
-      camera.lookAt(lv(0,0,p), lv(-1.85,-2.65,p), lv(0,0.44,p));
-      camera.fov=lv(42,12,p); camera.updateProjectionMatrix();
-      if(p>0.80) canvas.style.opacity=lv(1,0,(p-0.80)/0.20).toString();
-    }
-    if(t>=12) canvas.style.opacity='0';
+    // Single continuous arc: 0→TOTAL
+    // Phase 1 (0–3s): approach from side
+    // Phase 2 (1–5s): lid opens (overlaps with approach)
+    // Phase 3 (0–TOTAL): one smooth camera path from side → top → into chest
+
+    const TOTAL_CAM = TOTAL;
+    const p = Math.min(t / TOTAL_CAM, 1);
+
+    lidPivot.rotation.x = lv(0, -Math.PI*0.85, Math.min(p/0.25, 1));
+
+    // p1: first 22.5% = approach (was 45%, halved for less hold)
+    // p2: remaining 77.5% = zoom (was 55%, expanded + 20% faster internally)
+    const p1 = Math.min(p / 0.225, 1);
+    const p2raw = Math.max((p - 0.225) / 0.775, 0);
+    const p2 = Math.min(p2raw * 1.2, 1); // 20% faster zoom
+
+    const ex = lv(lv(12, 2, eio(p1)), lv(2, 0, eio(p2)), p2 > 0 ? 1 : 0);
+    const ey = lv(lv(5, 14, eio(p1)), lv(14, -1, ein(p2)), p2 > 0 ? 1 : 0);
+    const ez = lv(lv(12, 3, eio(p1)), lv(3, 0.44, eio(p2)), p2 > 0 ? 1 : 0);
+
+    camera.position.set(ex, ey, ez);
+
+    const lx = lv(0, 0, p);
+    const ly = lv(-1.5, lv(-1.85, -2.5, eio(p2)), eio(p1));
+    const lz = lv(0, lv(0, 0.44, eio(p2)), eio(p1));
+    camera.lookAt(lx, ly, lz);
+
+    camera.fov = lv(52, 14, ein(p2));
+    camera.updateProjectionMatrix();
+
+    if(p > 0.85) canvas.style.opacity = lv(1, 0, (p-0.85)/0.15).toString();
 
     renderer.render(scene,camera);
   }
