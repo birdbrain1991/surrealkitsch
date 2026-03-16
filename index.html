@@ -1183,34 +1183,40 @@ function startIntro() {
   wBox(1.5,1.5,1.5, -4,-2.4, -5, 0.2);
   wBox(2.5,2,  2.5,  5,-2.1, -6,-0.3);
 
-  // Central coffin – long, alien lies along X axis
-  const cW=9.5, cH=2.6, cD=3.0;
+  // Central coffin – square, bigger, alien fits inside
+  // cH deep enough so alien sits inside with room
+  const cW=4.8, cH=3.2, cD=4.8;
   const cGeo=new THREE.BoxGeometry(cW,cH,cD);
   const cMesh=new THREE.Mesh(cGeo,mDark);
-  cMesh.position.set(0,-1.85,0); scene.add(cMesh);
+  cMesh.position.set(0,-2.1,0); scene.add(cMesh);
   const cEdge=new THREE.LineSegments(new THREE.EdgesGeometry(cGeo),lGold);
-  cEdge.position.set(0,-1.85,0); scene.add(cEdge);
+  cEdge.position.set(0,-2.1,0); scene.add(cEdge);
+
+  // Coffin top y = -2.1 + cH/2 = -0.5
+  const coffinTopY = -2.1 + cH/2;   // = -0.5
+  const coffinFloorY = -2.1 - cH/2; // = -3.7
 
   // Coffin interior base
   const iGeo=new THREE.PlaneGeometry(cW-0.3,cD-0.3);
   const iMesh=new THREE.Mesh(iGeo,new THREE.MeshLambertMaterial({color:0x0a0606}));
-  iMesh.rotation.x=-Math.PI/2; iMesh.position.set(0,-3.12,0); scene.add(iMesh);
+  iMesh.rotation.x=-Math.PI/2; iMesh.position.set(0, coffinFloorY+0.02, 0); scene.add(iMesh);
 
-  // Lid – pivots from head end (-X side)
-  const lidGeo=new THREE.BoxGeometry(cW+0.12,0.16,cD+0.12);
-  const lidM=new THREE.Mesh(lidGeo,new THREE.MeshLambertMaterial({color:0x0a1408}));
-  const lidE=new THREE.LineSegments(new THREE.EdgesGeometry(lidGeo),lGold);
+  // Lid – pivot at back edge (Z = -cD/2), opens upward/backward away from camera
+  const lidGeo=new THREE.BoxGeometry(cW+0.12, 0.16, cD+0.12);
+  const lidM=new THREE.Mesh(lidGeo, new THREE.MeshLambertMaterial({color:0x0a1408}));
+  const lidE=new THREE.LineSegments(new THREE.EdgesGeometry(lidGeo), lGold);
   const lidPivot=new THREE.Group();
-  lidPivot.position.set(-cW/2,-0.38,0);
-  lidM.position.set(cW/2,0,0);
-  lidE.position.set(cW/2,0,0);
+  // Pivot sits at back edge of coffin top
+  lidPivot.position.set(0, coffinTopY, -cD/2);
+  // Lid center is cD/2 forward from pivot
+  lidM.position.set(0, 0, cD/2);
+  lidE.position.set(0, 0, cD/2);
   lidPivot.add(lidM); lidPivot.add(lidE);
   scene.add(lidPivot);
 
-  // ── ALIEN lying on back, head at -X ─────────────────────────────────────
+  // ── ALIEN inside coffin ───────────────────────────────────────────────────
   const ag=new THREE.Group();
-  ag.rotation.z = Math.PI/2;   // body axis now along world X (lying down)
-  ag.position.set(0, -2.0, 0); // raised so alien is inside coffin, not below floor
+  scene.add(ag);
   // ── LOAD ALIEN GLB FROM CLOUDINARY ──────────────────────────────────────
   const GLB_URL = 'https://birdbrain1991.github.io/surrealkitsch/GLOBULON.glb';
 
@@ -1223,41 +1229,39 @@ function startIntro() {
     loader.load(GLB_URL, (gltf) => {
       const model = gltf.scene;
 
-      // Compute bounding box BEFORE any transform
       const box = new THREE.Box3().setFromObject(model);
       const size = new THREE.Vector3();
       const center = new THREE.Vector3();
       box.getSize(size);
       box.getCenter(center);
+      console.log('GLB size:', size, 'center:', center);
 
-      console.log('GLB size:', size);
-      console.log('GLB center:', center);
-
-      // Scale so longest axis = 2.2 units
-      const scale = 2.2 / Math.max(size.x, size.y, size.z);
+      // Scale: 20% bigger than before → longest axis = 2.64
+      const scale = 2.64 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale);
 
-      // Center at origin first
-      model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+      // Center horizontally, but keep feet near floor
+      model.position.set(
+        -center.x * scale,
+        -box.min.y * scale,  // sit on floor, not float
+        -center.z * scale
+      );
 
-      // Lay flat on back (assuming model stands upright Y-up)
+      // Lay flat on back
       model.rotation.x = -Math.PI / 2;
 
-      // Place in coffin: y just above coffin floor
-      ag.position.set(0, -2.5, 0);
+      // Place group so alien floor = coffin floor + small offset
+      ag.position.set(0, coffinFloorY + 0.12, 0);
 
-      scene.add(model); // add directly to scene for debugging
-      console.log('GLB added to scene');
+      scene.add(model);
 
-      // Eye lights near where head should be
-      eyeL.position.set(-0.2, -0.8, 0.4);
-      eyeR.position.set( 0.2, -0.8, 0.4);
+      // Eye lights at head area (top of model when standing = front when lying)
+      const modelH = size.y * scale;
+      eyeL.position.set(-0.2, coffinFloorY + modelH * 0.25, modelH * 0.42);
+      eyeR.position.set( 0.2, coffinFloorY + modelH * 0.25, modelH * 0.42);
 
-    }, (xhr) => {
-      if (xhr.total) console.log('GLB:', Math.round(xhr.loaded/xhr.total*100)+'%');
-    }, (err) => {
+    }, undefined, (err) => {
       console.error('GLB error:', err);
-      // Visible fallback – bright red box so we know it failed
       const fb = new THREE.Mesh(
         new THREE.BoxGeometry(1,2,0.5),
         new THREE.MeshBasicMaterial({color:0xff0000})
@@ -1298,13 +1302,14 @@ function startIntro() {
       camera.position.set(lv(7,0.5,p), lv(3.8,15,p), lv(7,1,p));
       camera.lookAt(0,-1.85,0);
       camera.fov=lv(52,42,p); camera.updateProjectionMatrix();
-      lidPivot.rotation.z=lv(0,-Math.PI*0.80,p);
+      // Lid opens upward rotating around X axis (pivot at back edge)
+      lidPivot.rotation.x = lv(0, -Math.PI * 0.85, p);
     }
     if(t>=5.5&&t<8){
       camera.position.set(0.5,15,1);
       camera.lookAt(0,-1.85,0);
       camera.fov=42; camera.updateProjectionMatrix();
-      if(lidPivot.rotation.z>-Math.PI*0.80) lidPivot.rotation.z=-Math.PI*0.80;
+      if(lidPivot.rotation.x > -Math.PI*0.85) lidPivot.rotation.x = -Math.PI*0.85;
     }
     if(t>=8&&t<12){
       const p=ein((t-8)/4);
