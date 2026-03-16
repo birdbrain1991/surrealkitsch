@@ -209,6 +209,26 @@
   #main-ui { opacity: 0; transition: opacity 0.8s ease; }
   #main-ui.visible { opacity: 1; }
 
+  /* INTRO OVERLAY */
+  #intro {
+    position: fixed; inset: 0; z-index: 500;
+    background: #000;
+    opacity: 1; transition: opacity 1.2s ease;
+  }
+  #intro.fade-out { opacity: 0; pointer-events: none; }
+  #intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #skip-btn {
+    position: absolute; bottom: 36px; right: 36px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(180,160,80,0.5);
+    background: none; border: none; cursor: pointer;
+    transition: color 0.3s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #skip-btn:hover { color: rgba(200,180,100,0.9); }
+  #skip-btn::after { content:''; display:inline-block; width:20px; height:1px; background:currentColor; }
+
   /* Info panel – top right */
   #info-panel {
     position: fixed;
@@ -240,6 +260,11 @@
   #info-panel.transitioning #info-title,
   #info-panel.transitioning #info-meta { opacity: 0; }
 </style>
+
+<div id="intro">
+  <canvas id="intro-canvas"></canvas>
+  <button id="skip-btn">Skip</button>
+</div>
 
 <div id="main-ui">
 <a id="back-btn" href="https://birdbrain1991.github.io/vault/">Vault</a>
@@ -683,16 +708,29 @@ function imgDone() {
 
 function showGallery() {
   loaderText.textContent = 'enter';
-  // set initial info
   const c = clusters[0];
   infoTitle.textContent = c.title || '';
   infoMeta.innerHTML = (c.meta || '').replace(/\n/g, '<br>');
   setTimeout(() => {
     loaderEl.classList.add('fade-out');
-    mainUI.classList.add('visible');
-    setTimeout(() => { loaderEl.style.display = 'none'; }, 900);
+    setTimeout(() => {
+      loaderEl.style.display = 'none';
+      startIntro();
+    }, 900);
   }, 300);
 }
+
+function revealGallery() {
+  const intro = document.getElementById('intro');
+  intro.classList.add('fade-out');
+  mainUI.classList.add('visible');
+  setTimeout(() => { intro.style.display = 'none'; }, 1300);
+}
+
+document.getElementById('skip-btn').addEventListener('click', () => {
+  if (window._introRunning) window._introRunning = false;
+  revealGallery();
+});
 
 allImgs.forEach(img => {
   if (img.complete) { imgDone(); }
@@ -1061,6 +1099,217 @@ document.addEventListener('keydown', e => {
 
   requestAnimationFrame(frame);
 })();
+</script>
+
+
+<!-- THREE.JS INTRO -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+function startIntro() {
+  window._introRunning = true;
+  const canvas = document.getElementById('intro-canvas');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(canvas.width, canvas.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x050302, 1);
+  renderer.shadowMap.enabled = true;
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x050302, 0.028);
+
+  const camera = new THREE.PerspectiveCamera(52, canvas.width / canvas.height, 0.1, 300);
+
+  const C_GOLD  = 0xb8960a;
+  const C_GREEN = 0x2a5a1a;
+  const C_DIM   = 0x0d1608;
+  const C_SKIN  = 0xc07850;
+  const C_SKIND = 0x905838;
+  const C_EYE   = 0xfff080;
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0x180e06, 0.7));
+  const top = new THREE.PointLight(0x604010, 3.0, 20);
+  top.position.set(0, 7, 0); scene.add(top);
+  const fl = new THREE.PointLight(0x0a1e06, 1.2, 28);
+  fl.position.set(-9, 2, 0); scene.add(fl);
+  const fr = new THREE.PointLight(0x0a1e06, 1.0, 28);
+  fr.position.set(9, 2, 0); scene.add(fr);
+  const eyeL = new THREE.PointLight(C_EYE, 2.2, 3.5);
+  eyeL.position.set(-0.19, 0.3, 0.52); scene.add(eyeL);
+  const eyeR = new THREE.PointLight(C_EYE, 2.2, 3.5);
+  eyeR.position.set( 0.19, 0.3, 0.52); scene.add(eyeR);
+
+  // Materials
+  const mSkin  = new THREE.MeshLambertMaterial({ color: C_SKIN });
+  const mSkinD = new THREE.MeshLambertMaterial({ color: C_SKIND });
+  const mEye   = new THREE.MeshBasicMaterial({ color: C_EYE });
+  const mDark  = new THREE.MeshLambertMaterial({ color: 0x08100a });
+  const lGold  = new THREE.LineBasicMaterial({ color: C_GOLD });
+  const lGreen = new THREE.LineBasicMaterial({ color: C_GREEN });
+  const lDim   = new THREE.LineBasicMaterial({ color: C_DIM });
+
+  function lv(a,b,t){ return a+(b-a)*t; }
+  function eio(x){ return x<0.5?2*x*x:1-Math.pow(-2*x+2,2)/2; }
+  function eout(x){ return 1-Math.pow(1-x,3); }
+  function ein(x){ return x*x*x; }
+
+  // Floor
+  const flGeo = new THREE.PlaneGeometry(80,80,22,22);
+  const flMesh = new THREE.Mesh(flGeo, new THREE.MeshLambertMaterial({color:0x060a04}));
+  flMesh.rotation.x = -Math.PI/2; flMesh.position.y = -3.2; scene.add(flMesh);
+  const flEdge = new THREE.LineSegments(new THREE.EdgesGeometry(flGeo), lDim);
+  flEdge.rotation.x = -Math.PI/2; flEdge.position.y = -3.18; scene.add(flEdge);
+  const gridHelper = new THREE.GridHelper(80,30,C_DIM,C_DIM);
+  gridHelper.position.y = -3.17;
+  scene.add(gridHelper);
+
+  // Wireframe crates helper
+  function wBox(w,h,d,x,y,z,ry=0){
+    const g=new THREE.BoxGeometry(w,h,d);
+    const m=new THREE.Mesh(g,mDark);
+    m.position.set(x,y,z); m.rotation.y=ry; scene.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(g),lGold);
+    e.position.set(x,y,z); e.rotation.y=ry; scene.add(e);
+  }
+  wBox(3,  2.5,3,  -9, -2,  -8, 0.3);
+  wBox(2,  2,  2,  -12,-2.1,-12, 0.1);
+  wBox(4,  3,  4,   10,-1.7, -9,-0.2);
+  wBox(2.5,2,  2.5, 12,-2.1,-13, 0.4);
+  wBox(2,  1.8,2,   -7,-2.2,-15, 0.0);
+  wBox(3,  2,  3,    7,-2,  -15, 0.5);
+  wBox(1.5,1.5,1.5, -4,-2.4, -5, 0.2);
+  wBox(2.5,2,  2.5,  5,-2.1, -6,-0.3);
+
+  // Central coffin – long, alien lies along X axis
+  const cW=9.5, cH=2.6, cD=3.0;
+  const cGeo=new THREE.BoxGeometry(cW,cH,cD);
+  const cMesh=new THREE.Mesh(cGeo,mDark);
+  cMesh.position.set(0,-1.85,0); scene.add(cMesh);
+  const cEdge=new THREE.LineSegments(new THREE.EdgesGeometry(cGeo),lGold);
+  cEdge.position.set(0,-1.85,0); scene.add(cEdge);
+
+  // Coffin interior base
+  const iGeo=new THREE.PlaneGeometry(cW-0.3,cD-0.3);
+  const iMesh=new THREE.Mesh(iGeo,new THREE.MeshLambertMaterial({color:0x0a0606}));
+  iMesh.rotation.x=-Math.PI/2; iMesh.position.set(0,-3.12,0); scene.add(iMesh);
+
+  // Lid – pivots from head end (-X side)
+  const lidGeo=new THREE.BoxGeometry(cW+0.12,0.16,cD+0.12);
+  const lidM=new THREE.Mesh(lidGeo,new THREE.MeshLambertMaterial({color:0x0a1408}));
+  const lidE=new THREE.LineSegments(new THREE.EdgesGeometry(lidGeo),lGold);
+  const lidPivot=new THREE.Group();
+  lidPivot.position.set(-cW/2,-0.38,0);
+  lidM.position.set(cW/2,0,0);
+  lidE.position.set(cW/2,0,0);
+  lidPivot.add(lidM); lidPivot.add(lidE);
+  scene.add(lidPivot);
+
+  // ── ALIEN lying on back, head at -X ─────────────────────────────────────
+  const ag=new THREE.Group();
+  ag.rotation.z = Math.PI/2;   // body axis now along world X (lying down)
+  ag.position.set(0, -2.0, 0); // raised so alien is inside coffin, not below floor
+  // ── LOAD ALIEN GLB FROM CLOUDINARY ──────────────────────────────────────
+  const GLB_URL = 'https://birdbrain1991.github.io/surrealkitsch/GLOBULON.glb';
+
+  const loaderScript = document.createElement('script');
+  loaderScript.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js';
+  document.head.appendChild(loaderScript);
+
+  loaderScript.onload = () => {
+    const loader = new THREE.GLTFLoader();
+    loader.load(GLB_URL, (gltf) => {
+      const model = gltf.scene;
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const scale = 2.5 / Math.max(size.x, size.y, size.z);
+      model.scale.setScalar(scale);
+
+      box.setFromObject(model);
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      model.position.sub(center);
+
+      model.rotation.x = -Math.PI / 2;
+
+      ag.add(model);
+
+      const headH = size.y * scale * 0.75;
+      eyeL.position.set(-0.15, headH * 0.25, 0.35);
+      eyeR.position.set( 0.15, headH * 0.25, 0.35);
+
+    }, (xhr) => {
+      console.log('GLB loading:', Math.round(xhr.loaded / xhr.total * 100) + '%');
+    }, (err) => {
+      console.error('GLB error:', err);
+      ag.add(new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.4, 2.5, 8),
+        new THREE.MeshLambertMaterial({ color: 0xc07850 })
+      ));
+    });
+  };
+
+  // ── CAMERA TIMELINE ───────────────────────────────────────────────────────
+  // 0–3s:   Wide side shot, approach coffin from front-right
+  // 3–5.5s: Arc up to top-down, lid opens
+  // 5.5–8s: Hold top-down, observe alien
+  // 8–12s:  Descend from above, zoom into chest
+  // 12–14s: Fade to black → gallery
+
+  let t=0; const TOTAL=14; let done=false;
+
+  function animate(){
+    if(!window._introRunning) return;
+    requestAnimationFrame(animate);
+    t+=1/60;
+    if(t>TOTAL&&!done){ done=true; revealGallery(); return; }
+    if(done) return;
+
+    // Eye pulse
+    const ep = 1.6+0.6*Math.sin(t*1.6);
+    eyeL.intensity = eyeR.intensity = ep;
+
+    if(t<3){
+      const p=eout(t/3);
+      camera.position.set(lv(12,7,p), lv(5,3.8,p), lv(12,7,p));
+      camera.lookAt(0,-0.5,0);
+      camera.fov=52; camera.updateProjectionMatrix();
+    }
+    if(t>=3&&t<5.5){
+      const p=eio((t-3)/2.5);
+      camera.position.set(lv(7,0.5,p), lv(3.8,15,p), lv(7,1,p));
+      camera.lookAt(0,-1.85,0);
+      camera.fov=lv(52,42,p); camera.updateProjectionMatrix();
+      lidPivot.rotation.z=lv(0,-Math.PI*0.80,p);
+    }
+    if(t>=5.5&&t<8){
+      camera.position.set(0.5,15,1);
+      camera.lookAt(0,-1.85,0);
+      camera.fov=42; camera.updateProjectionMatrix();
+      if(lidPivot.rotation.z>-Math.PI*0.80) lidPivot.rotation.z=-Math.PI*0.80;
+    }
+    if(t>=8&&t<12){
+      const p=ein((t-8)/4);
+      // Chest in world: alien local y=0.28 → world y = -2.0+0.28 = -1.72, z=0.44
+      camera.position.set(
+        lv(0.5, 0,    p),
+        lv(15,  0.5,  p),
+        lv(1,   0.44, p)
+      );
+      camera.lookAt(lv(0,0,p), lv(-1.85,-1.72,p), lv(0,0.44,p));
+      camera.fov=lv(42,12,p); camera.updateProjectionMatrix();
+      if(p>0.80) canvas.style.opacity=lv(1,0,(p-0.80)/0.20).toString();
+    }
+    if(t>=12) canvas.style.opacity='0';
+
+    renderer.render(scene,camera);
+  }
+  animate();
+}
 </script>
 </body>
 </html>
