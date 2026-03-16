@@ -1240,18 +1240,12 @@ function startIntro() {
       const scale = 2.64 / Math.max(size.x, size.y, size.z);
       model.scale.setScalar(scale);
 
-      // Center horizontally, but keep feet near floor
-      model.position.set(
-        -center.x * scale,
-        -box.min.y * scale,  // sit on floor, not float
-        -center.z * scale
-      );
-
-      // Lay flat on back
+      // After rotation.x = -PI/2, model's Y becomes Z
+      // Place alien so it sits inside the coffin box
+      model.position.set(-center.x * scale, 0, -center.z * scale);
       model.rotation.x = -Math.PI / 2;
-
-      // Place group so alien sits inside coffin
-      ag.position.set(0, coffinFloorY - 0.8 - 3.2, 0);
+      // ag sits at coffin floor
+      ag.position.set(0, -3.68, 0);
 
       scene.add(model);
 
