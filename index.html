@@ -78,22 +78,26 @@
     position: absolute;
     transform: translate(-50%, -50%);
     border-radius: 50%;
-    background-size: cover;
-    background-position: center;
-    background-color: #1a0505;
-    clip-path: circle(50%);
+    overflow: hidden;
     cursor: pointer;
     pointer-events: all;
+    animation: poreDivBreathe 3.8s ease-in-out infinite;
+  }
+  .pore-div img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
     filter: saturate(0.75) brightness(0.82) contrast(1.08);
     transition: filter 0.3s ease;
-    animation: poreDivBreathe 3.8s ease-in-out infinite;
+  }
+  .pore-div.hovered img {
+    filter: saturate(1.15) brightness(1.08) contrast(1.0);
   }
   @keyframes poreDivBreathe {
     0%   { transform: translate(-50%,-50%) scale(1); }
     45%  { transform: translate(-50%,-50%) scale(1.04); }
     100% { transform: translate(-50%,-50%) scale(1); }
   }
-  /* clip-path keeps image inside circle even during scale */
 
   .cluster-label { position:absolute; bottom:-52px; left:50%; transform:translateX(-50%);
     font-size:11px; letter-spacing:0.22em; text-transform:uppercase;
@@ -474,33 +478,26 @@ function buildCluster(ci) {
   pores.slice(0, n).forEach((p, i) => {
     const url = c.images[i];
     if (!url) return;
-    // positions are in SVG units (0-560), convert to %
     const pct_x = (p.cx / 560 * 100).toFixed(3);
     const pct_y = (p.cy / 560 * 100).toFixed(3);
-    const pct_r = (p.r  / 560 * 100).toFixed(3);
+    const pct_d = (p.r * 2 / 560 * 100).toFixed(3);
     const delay = (i * 0.28).toFixed(2);
 
     const poreDiv = document.createElement('div');
     poreDiv.className = 'pore-div';
-    poreDiv.style.cssText = `
-      left:${pct_x}%;
-      top:${pct_y}%;
-      width:${(pct_r*2).toFixed(3)}%;
-      height:${(pct_r*2).toFixed(3)}%;
-      background-image:url('${thumbUrl(url)}');
-      animation-delay:${delay}s;
-    `;
+    poreDiv.style.cssText = `left:${pct_x}%;top:${pct_y}%;width:${pct_d}%;height:${pct_d}%;animation-delay:${delay}s;`;
     poreDiv.dataset.ci  = ci;
     poreDiv.dataset.idx = i;
-    poreDiv.dataset.src = thumbUrl(url);
+
+    const img = document.createElement('img');
+    img.src = thumbUrl(url);
+    img.decoding = 'sync';
+    img.draggable = false;
+    poreDiv.appendChild(img);
 
     poreDiv.addEventListener('click', () => openLightbox(ci, i));
-    poreDiv.addEventListener('mouseenter', () => {
-      poreDiv.style.filter = 'saturate(1.15) brightness(1.08)';
-    });
-    poreDiv.addEventListener('mouseleave', () => {
-      poreDiv.style.filter = '';
-    });
+    poreDiv.addEventListener('mouseenter', () => poreDiv.classList.add('hovered'));
+    poreDiv.addEventListener('mouseleave', () => poreDiv.classList.remove('hovered'));
 
     poreWrap.appendChild(poreDiv);
   });
@@ -531,7 +528,16 @@ function preloadImage(url) {
   if (imageCache.has(url)) return imageCache.get(url);
   const p = new Promise(resolve => {
     const img = new Image();
-    img.onload = img.onerror = () => { imageCache.set(url, true); resolve(url); };
+    img.onload = () => {
+      // force full decode so browser won't lazy-decode later
+      if (img.decode) {
+        img.decode().then(() => { imageCache.set(url, true); resolve(url); })
+                    .catch(() => { imageCache.set(url, true); resolve(url); });
+      } else {
+        imageCache.set(url, true); resolve(url);
+      }
+    };
+    img.onerror = () => { imageCache.set(url, true); resolve(url); };
     img.src = url;
   });
   imageCache.set(url, p);
