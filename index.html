@@ -651,8 +651,8 @@ function buildCluster(ci) {
     const poreDiv = document.createElement('div');
     poreDiv.className = 'pore-div';
     poreDiv.style.cssText = `left:${pct_x}%;top:${pct_y}%;width:${pct_d}%;height:${pct_d}%;animation-delay:${delay}s;`;
-    poreDiv.dataset.ci  = ci;
-    poreDiv.dataset.idx = i;
+    poreDiv.dataset.ci  = String(ci);
+    poreDiv.dataset.idx = String(i);
 
     const img = document.createElement('img');
     img.src = thumbUrl(url);
@@ -660,7 +660,9 @@ function buildCluster(ci) {
     img.draggable = false;
     poreDiv.appendChild(img);
 
-    poreDiv.addEventListener('click', () => openLightbox(ci, i));
+    poreDiv.addEventListener('click', function() {
+      openLightbox(Number(this.dataset.ci), Number(this.dataset.idx));
+    });
     poreDiv.addEventListener('mouseenter', () => poreDiv.classList.add('hovered'));
     poreDiv.addEventListener('mouseleave', () => poreDiv.classList.remove('hovered'));
 
